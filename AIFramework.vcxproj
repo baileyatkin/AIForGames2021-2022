@@ -384,6 +384,7 @@
     <ClInclude Include="main.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="MyStructs.h" />
     <ClInclude Include="PickupItem.h" />
     <CLInclude Include="resource.h" />
     <ClInclude Include="structures.h" />

@@ -7,8 +7,17 @@ struct ID3D11Device;
 #include <DirectXCollision.h> // this is the dx collision class helper
 using namespace DirectX; // this means you don't need to put DirectX:: in front of objects like XMVECTOR and so on. 
 
-
+#include <random>
+#include <ctime>
 #include <vector>
+#include <queue>
+#include <thread>
+#include <iostream>
+#include <functional>
+#include <utility>
+#include <unordered_map>
+#include <string>
+#include "MyStructs.h"
 using namespace std;
 
 class Waypoint;
@@ -33,6 +42,8 @@ public:
 
 	Waypoint* getQuadpoint(const unsigned int index);
 	size_t getQuadpointCount() { return m_quadpoints.size(); }
+
+	Waypoint* getRandomWaypoint();
 
 
 	//Waypoint* getWaypoint(const int x, const  int y);

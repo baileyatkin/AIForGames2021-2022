@@ -53,6 +53,7 @@
       <Filter>Core %28do not edit%29</Filter>
     </ClInclude>
     <ClInclude Include="CollisionHelper.h" />
+    <ClInclude Include="MyStructs.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\blue.dds">

@@ -5,10 +5,17 @@
 #include "Waypoint.h"
 #include "main.h"
 #include "constants.h"
+#include "MyStructures.h"
 
 AIManager::AIManager()
 {
-	m_pCar = nullptr;
+	m_bCar = nullptr;
+    m_rCar = nullptr;
+    wandering = false;
+    seeking = false;
+    fleeing = false;
+    pathing = false;
+    rwp = nullptr;
 }
 
 AIManager::~AIManager()
@@ -26,8 +33,14 @@ void AIManager::release()
 	}
 	m_pickups.clear();
 
-	delete m_pCar;
-	m_pCar = nullptr;
+	delete m_bCar;
+	m_bCar = nullptr;
+
+    delete m_rCar;
+    m_rCar = nullptr;
+
+    delete rwp;
+    rwp = nullptr;
 }
 
 HRESULT AIManager::initialise(ID3D11Device* pd3dDevice)
@@ -36,15 +49,22 @@ HRESULT AIManager::initialise(ID3D11Device* pd3dDevice)
     float xPos = -500; // an abtrirary start point
     float yPos = 300;
 
-    m_pCar = new Vehicle();
-    HRESULT hr = m_pCar->initMesh(pd3dDevice, carColour::blueCar);
-    m_pCar->setVehiclePosition(Vector2D(xPos, yPos));
+    m_bCar = new Vehicle();
+    HRESULT hr = m_bCar->initMesh(pd3dDevice, carColour::blueCar);
+    m_bCar->setVehiclePosition(Vector2D(xPos, yPos));
     if (FAILED(hr))
         return hr;
 
+    m_rCar = new Vehicle();
+    HRESULT hr_2 = m_rCar->initMesh(pd3dDevice, carColour::redCar);
+    m_rCar->setVehiclePosition(Vector2D(xPos, yPos));
+    if (FAILED(hr_2))
+        return hr_2;
+
     // setup the waypoints
     m_waypointManager.createWaypoints(pd3dDevice);
-    m_pCar->setWaypointManager(&m_waypointManager);
+    m_bCar->setWaypointManager(&m_waypointManager);
+    m_rCar->setWaypointManager(&m_waypointManager);
 
     // create a passenger pickup item
     PickupItem* pPickupPassenger = new PickupItem();
@@ -55,6 +75,12 @@ HRESULT AIManager::initialise(ID3D11Device* pd3dDevice)
 
     // (needs to be done after waypoint setup)
     setRandomPickupPosition(pPickupPassenger);
+
+    for (unsigned int i = 0; i < m_waypointManager.getWaypointCount(); i++) {
+        node* tempNode = new node();
+        tempNode->position = m_waypointManager.getWaypoint(i)->getPosition();
+        nodes.push_back(tempNode);
+    }
 
     return hr;
 }
@@ -67,12 +93,12 @@ void AIManager::update(const float fDeltaTime)
         AddItemToDrawList(m_waypointManager.getWaypoint(i)); // if you uncomment this, it will display the waypoints
     }
 
-    for (int i = 0; i < m_waypointManager.getQuadpointCount(); i++)
-    {
-        Waypoint* qp = m_waypointManager.getQuadpoint(i);
-        qp->update(fDeltaTime);
-        //AddItemToDrawList(qp); // if you uncomment this, it will display the quad waypoints
-    }
+    //for (int i = 0; i < m_waypointManager.getQuadpointCount(); i++)
+    //{
+    //    Waypoint* qp = m_waypointManager.getQuadpoint(i);
+    //    qp->update(fDeltaTime);
+    //    AddItemToDrawList(qp); // if you uncomment this, it will display the quad waypoints
+    //}
 
     // update and display the pickups
     for (unsigned int i = 0; i < m_pickups.size(); i++) {
@@ -80,26 +106,93 @@ void AIManager::update(const float fDeltaTime)
         AddItemToDrawList(m_pickups[i]);
     }
 
-	// draw the waypoints nearest to the car
-	/*
-    Waypoint* wp = m_waypointManager.getNearestWaypoint(m_pCar->getPosition());
-	if (wp != nullptr)
-	{
-		vecWaypoints vwps = m_waypointManager.getNeighbouringWaypoints(wp);
-		for (Waypoint* wp : vwps)
-		{
-			AddItemToDrawList(wp);
-		}
-	}
-    */
+    // draw the waypoints nearest to the car
+    Waypoint* wp = m_waypointManager.getNearestWaypoint(m_bCar->getPosition());
+    if (wp != nullptr)
+    {
+        vecWaypoints vwps = m_waypointManager.getNeighbouringWaypoints(wp);
+        for (Waypoint* wp : vwps)
+        {
+            AddItemToDrawList(wp);
+        }
+    }
 
-    // update and draw the car (and check for pickup collisions)
-	if (m_pCar != nullptr)
+    if (wandering)
+    {
+        if ((time(0) - timer > 2) || (m_rCar->getPosition() == targetPos))
+        {
+            timer = time(0);
+            rwp = m_waypointManager.getRandomWaypoint();
+            targetPos = rwp->getPosition();
+            m_rCar->setPositionTo(rwp->getPosition());
+        }
+    }
+
+    if (seeking)
+    {
+        m_bCar->setPositionTo(m_rCar->getPosition());
+    }
+
+    if (fleeing)
+    {
+        //Program will check if the red car is close enough to the blue car, if it is, the program will gather the neighbouring waypoints to the waypoint the blue car is currently on, comparing them all to
+        //see which is the furthest away from the red car, the blue car will then travel to that waypoint
+        if (fabs(bluePos.x - redPos.x) <= 50.0 && fabs(bluePos.y - redPos.y) <= 50.0)
+        {
+            vecWaypoints nwps = m_waypointManager.getNeighbouringWaypoints(m_waypointManager.getNearestWaypoint(bluePos));
+            Vector2D tempPos = bluePos;
+            for (Waypoint* twp : nwps)
+            {
+                Vector2D wpPos = twp->getPosition();
+                Vector2D pos1;
+                Vector2D pos2;
+                pos1.x = fabs(redPos.x - tempPos.x);
+                pos1.y = fabs(redPos.y - tempPos.y);
+                pos2.x = fabs(redPos.x - wpPos.x);
+                pos2.y = fabs(redPos.y - wpPos.y);
+                if (fabs((pos1.x * pos1.x) - (pos1.y - pos1.y)) < fabs((pos2.x * pos2.x) - (pos2.y * pos2.y)))
+                {
+                    tempPos = wpPos;
+                }
+            }
+
+            m_bCar->setPositionTo(tempPos);
+            OutputDebugStringA("Red car still near \n");
+        }
+    }
+
+    if (pathing)
+    {
+        if (!nodePath.empty())
+        {
+            m_bCar->setPositionTo(nodePath.front()->position);
+            if (bluePos == nodePath.front()->position)
+            {
+                nodePath.pop();
+            }
+        }
+        else
+        {
+            pathing = false;
+        }
+    }
+
+    // update and draw the cars (and check for pickup collisions)
+	if (m_bCar != nullptr)
 	{
-		m_pCar->update(fDeltaTime);
+		m_bCar->update(fDeltaTime);
 		checkForCollisions();
-		AddItemToDrawList(m_pCar);
+		AddItemToDrawList(m_bCar);
+        bluePos = m_bCar->getPosition();
 	}
+
+    if (m_rCar != nullptr)
+    {
+        m_rCar->update(fDeltaTime);
+        checkForCollisions();
+        AddItemToDrawList(m_rCar);
+        redPos = m_rCar->getPosition();
+    }
 }
 
 void AIManager::mouseUp(int x, int y)
@@ -109,8 +202,15 @@ void AIManager::mouseUp(int x, int y)
 	if (wp == nullptr)
 		return;
 
+    node* carNode = new node();
+    node* goalNode = new node();
+    carNode->position = bluePos;
+    goalNode->position = wp->getPosition();
+    pathfinding(carNode, goalNode);
+
     // steering mode
-    m_pCar->setPositionTo(wp->getPosition());
+    m_bCar->setPositionTo(nodePath.front()->position);
+    pathing = true;
 }
 
 void AIManager::keyUp(WPARAM param)
@@ -126,12 +226,89 @@ void AIManager::keyUp(WPARAM param)
     }
 }
 
+void AIManager::pathfinding(node* startNode, node* endNode)
+{
+
+    auto heuristic = [](node* nodeA, node* nodeB)
+    {
+        double x = abs(nodeA->position.x - nodeB->position.x);
+        double y = abs(nodeA->position.y - nodeB->position.y);
+        return x + y;
+    };
+
+    node* currentNode = new node();
+    typedef pair<node*, float> costNode;
+    priority_queue<costNode, vector<costNode>, greater<costNode>> pathQueue;
+    pathQueue.emplace(make_pair(startNode, 0.0f));
+    unordered_map<node*, node*> cameFrom;
+    unordered_map<node*, double> costSoFar;
+    costSoFar[startNode] = 0;
+    cameFrom[startNode] = startNode;
+
+    while (!pathQueue.empty())
+    {
+        currentNode = pathQueue.top().first;
+        pathQueue.pop();
+
+        if (currentNode->position == endNode->position)
+            break;
+
+        currentNode->neighbours = getNodeNeighbours(currentNode);
+
+        for (auto neighbour : currentNode->neighbours)
+        {
+            double newCost = costSoFar[currentNode] + heuristic(endNode, neighbour);
+
+            if (costSoFar.find(neighbour) == costSoFar.end() || newCost < costSoFar[neighbour])
+            {
+                costSoFar[neighbour] = newCost;
+                cameFrom[neighbour] = currentNode;
+                pathQueue.emplace(neighbour, newCost);
+            }
+        }
+    }
+    vector<node*> optimalPath;
+    node* current = endNode;
+    while (current != startNode)
+    {
+        optimalPath.push_back(current);
+        current = cameFrom[current];
+    }
+    optimalPath.push_back(startNode);
+    std::reverse(optimalPath.begin(), optimalPath.end());
+    for (node* nextNode : optimalPath)
+    {
+        nodePath.push(nextNode);
+    }
+}
+
+vecNodes AIManager::getNodeNeighbours(node* currentNode)
+{
+    vecNodes nodeVector;
+    vecWaypoints wpNeighbours = m_waypointManager.getNeighbouringWaypoints(m_waypointManager.getNearestWaypoint(currentNode->position));
+    for (Waypoint* wp : wpNeighbours)
+    {
+        for (node* tNode : nodes)
+        {
+            if (tNode->position == wp->getPosition())
+            {
+
+                nodeVector.push_back(tNode);
+            }
+        }
+    }
+    return nodeVector;
+}
+
 void AIManager::keyDown(WPARAM param)
 {
 	// hint 65-90 are a-z
 	const WPARAM key_a = 65;
 	const WPARAM key_s = 83;
     const WPARAM key_t = 84;
+    const WPARAM key_w = 87;
+    const WPARAM key_p = 80;
+    const WPARAM key_f = 70;
     const WPARAM key_space = 32;
 
     switch (param)
@@ -154,9 +331,26 @@ void AIManager::keyDown(WPARAM param)
         case key_a:
         {
             OutputDebugStringA("a Down \n");
+
             break;
         }
-
+        case key_w:
+        {
+            if (!wandering)
+            {
+                timer = time(0);
+                Waypoint* rwp = m_waypointManager.getRandomWaypoint();
+                targetPos = rwp->getPosition();
+                m_rCar->setPositionTo(rwp->getPosition());
+                wandering = true;
+                break;
+            }
+            if (wandering)
+            {
+                wandering = false;
+                break;
+            }
+        }
         case key_space:
         {
             mouseUp(0, 0);
@@ -165,11 +359,42 @@ void AIManager::keyDown(WPARAM param)
 
 		case key_s:
 		{
+            m_rCar->setPositionTo(m_waypointManager.getRandomWaypoint()->getPosition());
 			break;
 		}
         case key_t:
 		{
             break;
+        }
+
+        case key_p:
+        {
+            if (!seeking)
+            {
+                seeking = true;
+                m_bCar->setPositionTo(m_rCar->getPosition());
+                break;
+            }
+            if (seeking)
+            {
+                seeking = false;
+                break;
+            }
+            break;
+        }
+
+        case key_f:
+        {
+            if (!fleeing)
+            {
+                fleeing = true;
+                break;
+            }
+            if (fleeing)
+            {
+                fleeing = false;
+                break;
+            }
         }
         // etc
         default:
@@ -181,7 +406,6 @@ void AIManager::setRandomPickupPosition(PickupItem* pickup)
 {
     if (pickup == nullptr)
         return;
-
     int x = (rand() % SCREEN_WIDTH) - (SCREEN_WIDTH / 2);
     int y = (rand() % SCREEN_HEIGHT) - (SCREEN_HEIGHT / 2);
 
@@ -221,7 +445,7 @@ bool AIManager::checkForCollisions()
         &carScale,
         &dummy,
         &carPos,
-        XMLoadFloat4x4(m_pCar->getTransform())
+        XMLoadFloat4x4(m_bCar->getTransform())
     );
 
     // create a bounding sphere for the car

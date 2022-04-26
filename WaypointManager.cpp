@@ -116,6 +116,13 @@ Waypoint* WaypointManager::getWaypoint(const unsigned int index)
 	return m_waypoints[index];
 }
 
+Waypoint* WaypointManager::getRandomWaypoint()
+{
+	const unsigned int randNum = rand() % m_waypoints.size() + 0;
+	
+	return m_waypoints[randNum];
+}
+
 Waypoint* WaypointManager::getQuadpoint(const unsigned int index)
 {
 	if (index >= m_quadpoints.size())

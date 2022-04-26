@@ -1,12 +1,14 @@
 #pragma once
 
 #include "WaypointManager.h"
+#include "MyStructs.h"
 
 using namespace std;
 
 class Vehicle;
 class PickupItem;
 typedef vector<PickupItem*> vecPickups;
+typedef vector<node*> vecNodes;
 
 class AIManager
 {
@@ -19,6 +21,8 @@ public:
 	void	mouseUp(int x, int y);
 	void	keyDown(WPARAM param);
 	void	keyUp(WPARAM param);
+	void	pathfinding(node* startNode, node* endNode);
+	vecNodes getNodeNeighbours(node* currentNode);
 
 protected:
 	bool	checkForCollisions();
@@ -26,8 +30,21 @@ protected:
 
 private:
 	vecPickups              m_pickups;
-	Vehicle*				m_pCar = nullptr;
+	Vehicle*				m_bCar = nullptr;
+	Vehicle*				m_rCar = nullptr;
 	WaypointManager			m_waypointManager;
+	bool					wandering;
+	bool					seeking;
+	bool					fleeing;
+	bool					pathing;
+	time_t					timer;
+	Waypoint*				rwp;
+	Vector2D				targetPos;
+	Vector2D				redPos;
+	Vector2D				bluePos;
+	queue<node*>			nodePath;
+	vector<node*>			nodes;
+
 
 };
 
