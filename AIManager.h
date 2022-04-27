@@ -21,8 +21,9 @@ public:
 	void	mouseUp(int x, int y);
 	void	keyDown(WPARAM param);
 	void	keyUp(WPARAM param);
-	void	pathfinding(node* startNode, node* endNode);
+	void	pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car);
 	vecNodes getNodeNeighbours(node* currentNode);
+	void	clearPath(queue<Waypoint*>);
 
 protected:
 	bool	checkForCollisions();
@@ -42,7 +43,10 @@ private:
 	Vector2D				targetPos;
 	Vector2D				redPos;
 	Vector2D				bluePos;
-	queue<node*>			nodePath;
+	queue<Waypoint*>			bluePath;
+	queue<Waypoint*>			redPath;
+	node*					redNode;
+	node*					blueNode;
 	vector<node*>			nodes;
 
 

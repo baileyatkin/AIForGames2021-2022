@@ -163,12 +163,12 @@ void AIManager::update(const float fDeltaTime)
 
     if (pathing)
     {
-        if (!nodePath.empty())
+        if (!bluePath.empty())
         {
-            m_bCar->setPositionTo(nodePath.front()->position);
-            if (bluePos == nodePath.front()->position)
+            m_bCar->setPositionTo(bluePath.front()->getPosition());
+            if (bluePos == bluePath.front()->getPosition())
             {
-                nodePath.pop();
+                bluePath.pop();
             }
         }
         else
@@ -202,14 +202,16 @@ void AIManager::mouseUp(int x, int y)
 	if (wp == nullptr)
 		return;
 
+    Waypoint* startPos = m_waypointManager.getNearestWaypoint(bluePos);
+
     node* carNode = new node();
     node* goalNode = new node();
     carNode->position = bluePos;
     goalNode->position = wp->getPosition();
-    pathfinding(carNode, goalNode);
+    pathfinding(startPos, wp, m_bCar);
 
     // steering mode
-    m_bCar->setPositionTo(nodePath.front()->position);
+    m_bCar->setPositionTo(bluePath.front()->getPosition());
     pathing = true;
 }
 
@@ -226,62 +228,81 @@ void AIManager::keyUp(WPARAM param)
     }
 }
 
-void AIManager::pathfinding(node* startNode, node* endNode)
+void AIManager::pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car)
 {
-
-    auto heuristic = [](node* nodeA, node* nodeB)
+    if (car == m_bCar)
+        clearPath(bluePath);
+    if (car == m_rCar)
+        clearPath(redPath);
+    auto heuristic = [](Waypoint* nodeA, Waypoint* nodeB)
     {
-        double x = abs(nodeA->position.x - nodeB->position.x);
-        double y = abs(nodeA->position.y - nodeB->position.y);
+        double x = abs(nodeA->getXMPosition()->x - nodeB->getXMPosition()->x);
+        double y = abs(nodeA->getXMPosition()->y - nodeB->getXMPosition()->y);
         return x + y;
     };
 
-    node* currentNode = new node();
-    typedef pair<node*, float> costNode;
+    typedef pair<double, Waypoint*> costNode;
     priority_queue<costNode, vector<costNode>, greater<costNode>> pathQueue;
-    pathQueue.emplace(make_pair(startNode, 0.0f));
-    unordered_map<node*, node*> cameFrom;
-    unordered_map<node*, double> costSoFar;
+    pathQueue.emplace(make_pair(0.0f, startNode));
+    unordered_map<Waypoint*, Waypoint*> cameFrom;
+    unordered_map<Waypoint*, double> costSoFar;
     costSoFar[startNode] = 0;
-    cameFrom[startNode] = startNode;
+    cameFrom[startNode] = nullptr;
+
+    Waypoint* currentNode = startNode;
 
     while (!pathQueue.empty())
     {
-        currentNode = pathQueue.top().first;
+        currentNode = pathQueue.top().second;
         pathQueue.pop();
 
-        if (currentNode->position == endNode->position)
+        if (currentNode == endNode)
             break;
 
-        currentNode->neighbours = getNodeNeighbours(currentNode);
+        vector<Waypoint*> currentNodeNeighbours = m_waypointManager.getNeighbouringWaypoints(currentNode);
 
-        for (auto neighbour : currentNode->neighbours)
+        for (auto neighbour : currentNodeNeighbours)
         {
             double newCost = costSoFar[currentNode] + heuristic(endNode, neighbour);
-
-            if (costSoFar.find(neighbour) == costSoFar.end() || newCost < costSoFar[neighbour])
+            if (cameFrom.find(neighbour) == cameFrom.end() || newCost < costSoFar[neighbour])
             {
                 costSoFar[neighbour] = newCost;
                 cameFrom[neighbour] = currentNode;
-                pathQueue.emplace(neighbour, newCost);
+                pathQueue.emplace(newCost, neighbour);
             }
         }
     }
-    vector<node*> optimalPath;
-    node* current = endNode;
-    while (current != startNode)
+    vector<Waypoint*> optimalPath;
+    Waypoint* current = endNode;
+
+    while (current != nullptr)
     {
         optimalPath.push_back(current);
-        current = cameFrom[current];
+        current = cameFrom.find(current)->second;
     }
     optimalPath.push_back(startNode);
     std::reverse(optimalPath.begin(), optimalPath.end());
-    for (node* nextNode : optimalPath)
+    if (car == m_bCar)
     {
-        nodePath.push(nextNode);
+        for (Waypoint* nextNode : optimalPath)
+        {
+            bluePath.push(nextNode);
+        }
+    }
+    if (car == m_rCar)
+    {
+        for (Waypoint* nextNode : optimalPath)
+        {
+            redPath.push(nextNode);
+        }
     }
 }
 
+void AIManager::clearPath(queue<Waypoint*> clearQueue)
+{
+    queue<Waypoint*> empty;
+    swap(clearQueue, empty);
+}
 vecNodes AIManager::getNodeNeighbours(node* currentNode)
 {
     vecNodes nodeVector;
