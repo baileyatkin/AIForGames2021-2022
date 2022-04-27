@@ -184,6 +184,7 @@ void AIManager::update(const float fDeltaTime)
 		checkForCollisions();
 		AddItemToDrawList(m_bCar);
         bluePos = m_bCar->getPosition();
+        m_bCar->setVehiclePosition(Vector2D(bluePos));
 	}
 
     if (m_rCar != nullptr)
@@ -192,11 +193,13 @@ void AIManager::update(const float fDeltaTime)
         checkForCollisions();
         AddItemToDrawList(m_rCar);
         redPos = m_rCar->getPosition();
+        m_rCar->setVehiclePosition(Vector2D(redPos));
     }
 }
 
 void AIManager::mouseUp(int x, int y)
 {
+    pathing = false;
 	// get a waypoint near the mouse click, then set the car to move to the this waypoint
 	Waypoint* wp = m_waypointManager.getNearestWaypoint(Vector2D(x, y));
 	if (wp == nullptr)
@@ -230,10 +233,7 @@ void AIManager::keyUp(WPARAM param)
 
 void AIManager::pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car)
 {
-    if (car == m_bCar)
-        clearPath(bluePath);
-    if (car == m_rCar)
-        clearPath(redPath);
+    clearPath(car);
     auto heuristic = [](Waypoint* nodeA, Waypoint* nodeB)
     {
         double x = abs(nodeA->getXMPosition()->x - nodeB->getXMPosition()->x);
@@ -275,12 +275,11 @@ void AIManager::pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car
     vector<Waypoint*> optimalPath;
     Waypoint* current = endNode;
 
-    while (current != nullptr)
+    while (current != startNode)
     {
         optimalPath.push_back(current);
         current = cameFrom.find(current)->second;
     }
-    optimalPath.push_back(startNode);
     std::reverse(optimalPath.begin(), optimalPath.end());
     if (car == m_bCar)
     {
@@ -298,10 +297,13 @@ void AIManager::pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car
     }
 }
 
-void AIManager::clearPath(queue<Waypoint*> clearQueue)
+void AIManager::clearPath(Vehicle* car)
 {
     queue<Waypoint*> empty;
-    swap(clearQueue, empty);
+    if (car == m_bCar)
+        swap(bluePath, empty);
+    if (car == m_rCar)
+        swap(redPath, empty);
 }
 vecNodes AIManager::getNodeNeighbours(node* currentNode)
 {

@@ -48,7 +48,7 @@ void Vehicle::update(const float deltaTime)
 	Vector2D diff = m_currentPosition - m_lastPosition;
 	if (diff.Length() > 0) { // if zero then don't update rotation
 		diff.Normalize();
-		m_radianRotation = atan2f((float)diff.y, (float)diff.x); // this is used by DrawableGameObject to set the rotation
+		m_radianRotation = atan2f((float)diff.y / deltaTime, (float)diff.x / deltaTime); // this is used by DrawableGameObject to set the rotation
 	}
 	m_lastPosition = m_currentPosition;
 

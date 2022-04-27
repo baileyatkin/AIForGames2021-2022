@@ -23,7 +23,7 @@ public:
 	void	keyUp(WPARAM param);
 	void	pathfinding(Waypoint* startNode, Waypoint* endNode, Vehicle* car);
 	vecNodes getNodeNeighbours(node* currentNode);
-	void	clearPath(queue<Waypoint*>);
+	void	clearPath(Vehicle* car);
 
 protected:
 	bool	checkForCollisions();

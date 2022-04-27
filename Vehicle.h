@@ -35,6 +35,7 @@ protected: // protected methods
 protected: // preotected properties
 	float m_maxSpeed;
 	float m_currentSpeed;
+	flat m_acceleration;
 	
 	Vector2D m_currentPosition;
 	Vector2D m_startPosition;
